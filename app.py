@@ -15,9 +15,21 @@ TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 # DeepSeek API
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY')
-deepseek_client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url="https://api.deepseek.com")
 
-# Системный промпт — как ИИ должен себя вести
+# Проверяем, что ключи заданы
+if not DEEPSEEK_API_KEY:
+    logger.error("DEEPSEEK_API_KEY не задан в переменных окружения")
+if not TELEGRAM_TOKEN:
+    logger.error("TELEGRAM_TOKEN не задан в переменных окружения")
+
+# Инициализируем клиент только если ключ есть
+deepseek_client = None
+if DEEPSEEK_API_KEY:
+    deepseek_client = OpenAI(
+        api_key=DEEPSEEK_API_KEY,
+        base_url="https://api.deepseek.com"
+    )
+
 SYSTEM_PROMPT = """
 Ты — профессиональный консультант по пластиковым окнам в компании "Теплые Окна".
 Твоя задача:
@@ -29,7 +41,6 @@ SYSTEM_PROMPT = """
 """
 
 def send_message(chat_id, text):
-    """Отправка сообщения в Telegram"""
     url = f"{TELEGRAM_API_URL}/sendMessage"
     payload = {'chat_id': chat_id, 'text': text}
     try:
@@ -38,7 +49,8 @@ def send_message(chat_id, text):
         logger.error(f"Ошибка отправки в Telegram: {e}")
 
 def get_ai_response(user_message):
-    """Получение ответа от DeepSeek"""
+    if not deepseek_client:
+        return "⚠️ Извините, сервис временно недоступен. Попробуйте позже."
     try:
         response = deepseek_client.chat.completions.create(
             model="deepseek-chat",
@@ -63,11 +75,9 @@ def webhook():
         chat_id = update['message']['chat']['id']
         user_text = update['message'].get('text', '')
         
-        # Игнорируем команды (начинаются с /)
         if user_text.startswith('/'):
             return jsonify({'status': 'ok'}), 200
         
-        # Получаем ответ от ИИ
         ai_reply = get_ai_response(user_text)
         send_message(chat_id, ai_reply)
     
