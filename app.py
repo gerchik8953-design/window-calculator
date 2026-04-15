@@ -3,18 +3,26 @@ import logging
 from flask import Flask, request, jsonify
 import requests
 from openai import OpenAI
+import re
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Telegram
+# ========== НАСТРОЙКИ ==========
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
-# DeepSeek API
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY')
+
+# Контакты компании
+COMPANY_NAME = "Теплые Окна"
+COMPANY_PHONE = "+7 (953) 816-06-98"      
+COMPANY_ADDRESS = "г. Орел, ул. Приборостроительная, д. 13", этаж 2, офис 20
+COMPANY_WEBSITE = "https://teplydom-orel.ru/"
+COMPANY_VK = "https://vk.com/teplye_okna57"  
+# ================================
 
 if not DEEPSEEK_API_KEY:
     logger.error("DEEPSEEK_API_KEY не задан")
@@ -28,20 +36,27 @@ if DEEPSEEK_API_KEY:
         base_url="https://api.deepseek.com"
     )
 
-SYSTEM_PROMPT = """
-Ты — профессиональный консультант по пластиковым окнам в компании "Теплые Окна".
+# Системный промпт с контактами
+SYSTEM_PROMPT = f"""
+Ты — профессиональный консультант по пластиковым окнам в компании "{COMPANY_NAME}".
+
+КОНТАКТЫ КОМПАНИИ:
+- Телефон: {COMPANY_PHONE}
+- Адрес: {COMPANY_ADDRESS}
+- Сайт: {COMPANY_WEBSITE}
+- ВКонтакте: {COMPANY_VK}
+
 Твоя задача:
 - Отвечать на вопросы клиентов о ценах, профилях (REHAU, KBE, VEKA, HAGEL, KÖMMERLING), стеклопакетах.
-- Если клиент хочет заказать замер — дай контакты или скажи, что передашь заявку менеджеру.
+- Если клиент хочет заказать замер — передай контакты компании и скажи, что менеджер свяжется.
+- Если клиент спрашивает контакты, адрес, телефон, сайт, ВК — дай точную информацию из списка выше.
 - Будь вежливым, но не навязчивым.
-- Не придумывай цены, если их нет в памяти — скажи, что нужно уточнить у менеджера.
 - Отвечай на русском языке.
 - НИКОГДА не спрашивай номер телефона, адрес, email или другие личные данные.
 - Если клиент сам пишет контакты — не сохраняй их, просто поблагодари и скажи, что информация передана менеджеру.
 """
 
 def send_chat_action(chat_id, action):
-    """Отправляет сигнал «бот печатает»"""
     url = f"{TELEGRAM_API_URL}/sendChatAction"
     payload = {'chat_id': chat_id, 'action': action}
     try:
@@ -56,6 +71,23 @@ def send_message(chat_id, text):
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
         logger.error(f"Ошибка отправки в Telegram: {e}")
+
+def handle_contact_request(user_text):
+    """Проверяет, хочет ли клиент получить контакты"""
+    text_lower = user_text.lower()
+    keywords = ['контакт', 'телефон', 'номер', 'адрес', 'где находитесь', 'сайт', 'вк', 'связаться']
+    return any(keyword in text_lower for keyword in keywords)
+
+def get_contact_info():
+    return f"""📞 *Контакты {COMPANY_NAME}:*
+
+Телефон: {COMPANY_PHONE}
+Адрес: {COMPANY_ADDRESS}
+Сайт: {COMPANY_WEBSITE}
+ВКонтакте: {COMPANY_VK}
+
+Режим работы: будни с 9:30 до 18:00 выходной: воскресенье
+"""
 
 def get_ai_response(user_message):
     if not deepseek_client:
@@ -90,8 +122,12 @@ def webhook():
         # Отправляем сигнал «печатает...»
         send_chat_action(chat_id, "typing")
         
-        # Получаем ответ от ИИ
-        ai_reply = get_ai_response(user_text)
+        # Проверяем, запрашивает ли клиент контакты
+        if handle_contact_request(user_text):
+            ai_reply = get_contact_info()
+        else:
+            # Получаем ответ от ИИ
+            ai_reply = get_ai_response(user_text)
         
         # Отправляем готовый ответ
         send_message(chat_id, ai_reply)
