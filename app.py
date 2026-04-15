@@ -19,7 +19,7 @@ DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY')
 # Контакты компании
 COMPANY_NAME = "Теплые Окна"
 COMPANY_PHONE = "+7 (953) 816-06-98"      
-COMPANY_ADDRESS = "г. Орел, ул. Приборостроительная, д. 13", этаж 2, офис 20
+COMPANY_ADDRESS = "г. Орел, ул. Приборостроительная, д. 13", этаж 2, офис 20"
 COMPANY_WEBSITE = "https://teplydom-orel.ru/"
 COMPANY_VK = "https://vk.com/teplye_okna57"  
 # ================================
