@@ -3,7 +3,6 @@ import logging
 from flask import Flask, request, jsonify
 import requests
 from openai import OpenAI
-import re
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -16,13 +15,13 @@ TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY')
 
-# Контакты компании
+# КОНТАКТЫ КОМПАНИИ (ЗАМЕНИ НА СВОИ!)
 COMPANY_NAME = "Теплые Окна"
-COMPANY_PHONE = "+7 (953) 816-06-98"      
-COMPANY_ADDRESS = "г. Орел, ул. Приборостроительная, д. 13", этаж 2, офис 20"
-COMPANY_WEBSITE = "https://teplydom-orel.ru/"
-COMPANY_VK = "https://vk.com/teplye_okna57"  
-# ================================
+COMPANY_PHONE = "+7 (953) 816-06-98"
+COMPANY_ADDRESS = "г. Орел, ул. Приборостроительная, д. 13, этаж 2, офис 20"
+COMPANY_WEBSITE = "https://teplydom-orel.ru"
+COMPANY_VK = "https://vk.com/teplye_okna57"
+# =================================
 
 if not DEEPSEEK_API_KEY:
     logger.error("DEEPSEEK_API_KEY не задан")
@@ -57,6 +56,7 @@ SYSTEM_PROMPT = f"""
 """
 
 def send_chat_action(chat_id, action):
+    """Отправляет сигнал «бот печатает»"""
     url = f"{TELEGRAM_API_URL}/sendChatAction"
     payload = {'chat_id': chat_id, 'action': action}
     try:
@@ -75,7 +75,12 @@ def send_message(chat_id, text):
 def handle_contact_request(user_text):
     """Проверяет, хочет ли клиент получить контакты"""
     text_lower = user_text.lower()
-    keywords = ['контакт', 'телефон', 'номер', 'адрес', 'где находитесь', 'сайт', 'вк', 'связаться']
+    keywords = [
+        'контакт', 'телефон', 'номер', 'позвонить', 'созвонить',
+        'адрес', 'где находитесь', 'находитесь', 'офис', 'приехать',
+        'сайт', 'вк', 'связаться', 'связь', 'написать',
+        'как с вами', 'как с вами связаться'
+    ]
     return any(keyword in text_lower for keyword in keywords)
 
 def get_contact_info():
@@ -86,7 +91,7 @@ def get_contact_info():
 Сайт: {COMPANY_WEBSITE}
 ВКонтакте: {COMPANY_VK}
 
-Режим работы: будни с 9:30 до 18:00 выходной: воскресенье
+Режим работы: по будням с 9:30 до 18:00 выходной: воскресенье
 """
 
 def get_ai_response(user_message):
