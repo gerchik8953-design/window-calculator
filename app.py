@@ -16,13 +16,11 @@ TELEGRAM_API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 # DeepSeek API
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY')
 
-# Проверяем, что ключи заданы
 if not DEEPSEEK_API_KEY:
-    logger.error("DEEPSEEK_API_KEY не задан в переменных окружения")
+    logger.error("DEEPSEEK_API_KEY не задан")
 if not TELEGRAM_TOKEN:
-    logger.error("TELEGRAM_TOKEN не задан в переменных окружения")
+    logger.error("TELEGRAM_TOKEN не задан")
 
-# Инициализируем клиент только если ключ есть
 deepseek_client = None
 if DEEPSEEK_API_KEY:
     deepseek_client = OpenAI(
@@ -33,12 +31,21 @@ if DEEPSEEK_API_KEY:
 SYSTEM_PROMPT = """
 Ты — профессиональный консультант по пластиковым окнам в компании "Теплые Окна".
 Твоя задача:
-- Отвечать на вопросы клиентов о ценах на окна и балконы, профилях (REHAU, KBE, VEKA, HAGEL, KÖMMERLING), стеклопакетах.
+- Отвечать на вопросы клиентов о ценах, профилях (REHAU, KBE, VEKA, HAGEL, KÖMMERLING), стеклопакетах.
 - Если клиент хочет заказать замер — дай контакты или скажи, что передашь заявку менеджеру.
 - Будь вежливым, но не навязчивым.
 - Не придумывай цены, если их нет в памяти — скажи, что нужно уточнить у менеджера.
 - Отвечай на русском языке.
 """
+
+def send_chat_action(chat_id, action):
+    """Отправляет сигнал «бот печатает»"""
+    url = f"{TELEGRAM_API_URL}/sendChatAction"
+    payload = {'chat_id': chat_id, 'action': action}
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        logger.error(f"Ошибка отправки действия: {e}")
 
 def send_message(chat_id, text):
     url = f"{TELEGRAM_API_URL}/sendMessage"
@@ -78,7 +85,13 @@ def webhook():
         if user_text.startswith('/'):
             return jsonify({'status': 'ok'}), 200
         
+        # Отправляем сигнал «печатает...»
+        send_chat_action(chat_id, "typing")
+        
+        # Получаем ответ от ИИ
         ai_reply = get_ai_response(user_text)
+        
+        # Отправляем готовый ответ
         send_message(chat_id, ai_reply)
     
     return jsonify({'status': 'ok'}), 200
