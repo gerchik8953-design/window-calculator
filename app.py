@@ -51,19 +51,6 @@ def send_message(chat_id, text):
     except Exception as e:
         logger.error(f"Ошибка отправки в Telegram: {e}")
 
-def is_contact_request(text):
-    """Проверяет, хочет ли клиент получить контакты компании"""
-    text_lower = text.lower()
-    keywords = [
-        'телефон', 'номер', 'позвонить', 'созвонить', 'звонок',
-        'контакт', 'связаться', 'связь', 'контакты',
-        'адрес', 'где находитесь', 'находитесь', 'офис', 'приехать', 'локация',
-        'сайт', 'вебсайт', 'интернет сайт', 'страница',
-        'вк', 'вконтакте', 'группа вк', 'группа вконтакте',
-        'график', 'режим работы', 'работаете', 'открыто'
-    ]
-    return any(keyword in text_lower for keyword in keywords)
-
 def get_contact_info():
     return f"""📞 *Контакты {COMPANY_NAME}:*
 
@@ -73,11 +60,9 @@ def get_contact_info():
 ВКонтакте: {COMPANY_VK}
 
 *График работы:*
-Пн–Пт: 9:00 – 20:00
-Сб: 10:00 – 16:00
+Пн–Пт: 9:30 – 18:00
+Сб: 10:00 – 15:00
 Вс: выходной
-
-По всем вопросам обращайтесь, будем рады помочь!
 """
 
 @app.route('/webhook', methods=['POST'])
@@ -94,8 +79,14 @@ def webhook():
         
         send_chat_action(chat_id, "typing")
         
-        # Если запрос про контакты или график — отвечаем сразу, без DeepSeek
-        if is_contact_request(user_text):
+        # ЖЁСТКАЯ ПРОВЕРКА: если в сообщении есть слово "телефон" или "вк" или "контакт" — отвечаем сразу
+        text_lower = user_text.lower()
+        if 'телефон' in text_lower or 'номер' in text_lower or 'позвонить' in text_lower or \
+           'вк' in text_lower or 'вконтакте' in text_lower or \
+           'контакт' in text_lower or 'связаться' in text_lower or \
+           'адрес' in text_lower or 'сайт' in text_lower or \
+           'график' in text_lower or 'работаете' in text_lower:
+            logger.info(f"Запрос контактов, отвечаю сам, без DeepSeek. Сообщение: {user_text}")
             ai_reply = get_contact_info()
         else:
             if not deepseek_client:
@@ -105,18 +96,7 @@ def webhook():
                     response = deepseek_client.chat.completions.create(
                         model="deepseek-chat",
                         messages=[
-                            {"role": "system", "content": f"""
-Ты — консультант по пластиковым окнам в компании '{COMPANY_NAME}'.
-
-Твоя задача:
-- Отвечать на вопросы клиентов о ценах, профилях (REHAU, KBE, VEKA, HAGEL, KÖMMERLING), стеклопакетах.
-- Если клиент хочет заказать замер — скажи, что менеджер свяжется с ним по телефону, который он укажет.
-- Будь вежливым, но не навязчивым.
-- Отвечай на русском языке.
-- НИКОГДА не запрашивай у клиента его номер телефона, адрес, email или другие личные данные.
-- Если клиент сам пишет свои контакты — не сохраняй их, просто поблагодари и скажи, что менеджер свяжется.
-- НЕ давай контакты компании (телефон, адрес, сайт, ВК) — они уже обрабатываются отдельно.
-"""},
+                            {"role": "system", "content": f"Ты — консультант по окнам в '{COMPANY_NAME}'. Отвечай кратко, по делу, на русском. НИКОГДА не спрашивай телефон клиента."},
                             {"role": "user", "content": user_text}
                         ],
                         temperature=0.7,
