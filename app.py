@@ -1,10 +1,12 @@
 import os
+import re
 import logging
 from flask import Flask, request, jsonify
 import requests
 from openai import OpenAI
 
-logging.basicConfig(level=logging.INFO)
+# Настройка логирования — теперь без хранения сообщений
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -57,6 +59,12 @@ def get_contact_info():
 Вс: выходной
 """
 
+# === ФУНКЦИЯ ДЛЯ УДАЛЕНИЯ НОМЕРА ИЗ ЛОГА ===
+def mask_phone_number(text):
+    """Заменяет номер телефона в тексте на [НОМЕР УДАЛЁН] для логов"""
+    phone_pattern = r'(\+7|8)?[\s\-]?\(?[0-9]{3}\)?[\s\-]?[0-9]{3}[\s\-]?[0-9]{2}[\s\-]?[0-9]{2}'
+    return re.sub(phone_pattern, '[НОМЕР УДАЛЁН]', text)
+
 # === ВЕБХУК ===
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -66,6 +74,9 @@ def webhook():
 
     chat_id = data['message']['chat']['id']
     user_text = data['message'].get('text', '')
+    
+    # Логируем только ID пользователя и факт сообщения (без текста и номера)
+    logger.info(f"Получено сообщение от пользователя {chat_id}, длина: {len(user_text)} символов")
 
     if user_text.startswith('/'):
         return jsonify({'status': 'ok'}), 200
@@ -82,7 +93,13 @@ def webhook():
     
     # === ЗАЯВКА НА ЗАМЕР ===
     elif 'замер' in low or 'заявк' in low:
-        reply = "📐 Для вызова замерщика оставьте, пожалуйста, ваш номер телефона в личном сообщении. Менеджер свяжется с вами в ближайшее время для согласования даты и времени."
+        reply = "📐 Для вызова замерщика оставьте, пожалуйста, ваш номер телефона.\n\n⚠️ Отправляя номер, вы соглашаетесь на обработку персональных данных для связи с вами."
+    
+    # === ОТПРАВКА НОМЕРА ТЕЛЕФОНА ===
+    elif any(char.isdigit() for char in user_text) and len(user_text) > 9:
+        # Логируем факт получения номера, но сам номер не сохраняем
+        logger.info(f"Пользователь {chat_id} отправил номер телефона (данные не сохранены)")
+        reply = "✅ Спасибо! Ваш номер получен. Наш менеджер свяжется с вами в ближайшее время для согласования даты замера.\n\n📌 Ваши данные не хранятся на сервере и будут использованы только для связи."
     
     # === ОСТАЛЬНЫЕ ВОПРОСЫ — DEEPSEEK ===
     else:
