@@ -14,8 +14,11 @@ app = Flask(__name__)
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
 DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY')
 
-# ID менеджера для уведомлений (твой Telegram ID)
-MANAGER_CHAT_ID = 628935507  # Замени на свой ID, если нужно
+# ID администратора для копий диалогов (твой Telegram ID)
+ADMIN_CHAT_ID = 628935507  # Александр
+
+# ID менеджера для уведомлений о заявках
+MANAGER_CHAT_ID = 628935507  # Тот же ID (можно разделить)
 
 # Контакты компании
 COMPANY_NAME = "Теплые Окна"
@@ -95,6 +98,17 @@ def get_contact_info():
 Сб: 10:00 – 15:00
 Вс: выходной
 """
+
+def notify_admin(chat_id, user_question, bot_answer):
+    """Отправляет копию диалога администратору"""
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        # Обрезаем длинные ответы
+        answer_preview = bot_answer[:400] + "..." if len(bot_answer) > 400 else bot_answer
+        text = f"📋 *Новый диалог*\n\n👤 Пользователь ID: `{chat_id}`\n\n❓ Вопрос: {user_question[:200]}\n\n🤖 Ответ: {answer_preview}"
+        requests.post(url, json={'chat_id': ADMIN_CHAT_ID, 'text': text, 'parse_mode': 'Markdown'}, timeout=10)
+    except Exception as e:
+        logger.error(f"Ошибка уведомления админа: {e}")
 
 # === ВЕБХУК ===
 @app.route('/webhook', methods=['POST'])
@@ -200,6 +214,9 @@ def webhook():
             except Exception as e:
                 logger.error(f"DeepSeek ошибка: {e}")
                 reply = "⚠️ Извините, произошла ошибка. Попробуйте позже."
+        
+        # Отправляем копию диалога администратору (только для DeepSeek-вопросов)
+        notify_admin(chat_id, user_text, reply)
 
     send_message(chat_id, reply)
     return jsonify({'status': 'ok'}), 200
