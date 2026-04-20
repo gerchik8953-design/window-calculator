@@ -253,17 +253,9 @@ def webhook():
                 logger.error(f"DeepSeek ошибка: {e}")
                 reply = "⚠️ Извините, произошла ошибка. Попробуйте позже."
 
-    # === ОТПРАВКА КОПИИ АДМИНИСТРАТОРУ (для всех сообщений, кроме команд и кнопок) ===
+    # === ОТПРАВКА КОПИИ АДМИНИСТРАТОРУ ===
     if not user_text.startswith('/') and user_text not in ["📞 Контакты", "📐 Записаться на замер", "💰 Цены", "📸 Наши работы", "❓ Помощь"]:
         notify_admin(chat_id, user_text, reply)
 
     send_message(chat_id, reply)
     return jsonify({'status': 'ok'}), 200
-
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({'status': 'healthy'}), 200
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
