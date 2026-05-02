@@ -193,14 +193,14 @@ def webhook():
     elif extract_phone_number(user_text):
         reply = "❓ Если вы хотите записаться на замер, пожалуйста, напишите «Записаться на замер». Я помогу оформить заявку."
     
-    # === ОСТАЛЬНЫЕ ВОПРОСЫ — DEEPSEEK ===
+   # === ОСТАЛЬНЫЕ ВОПРОСЫ — DEEPSEEK ===
     else:
         if not deepseek_client:
             reply = "⚠️ Сервис временно недоступен"
         else:
             try:
                 response = deepseek_client.chat.completions.create(
-                    model="deepseek-chat",
+                    model="deepseek-v4-flash",
                     messages=[
                         {"role": "system", "content": f"""
 Ты — консультант по пластиковым окнам в компании "{COMPANY_NAME}".
